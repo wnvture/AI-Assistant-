@@ -1,0 +1,147 @@
+{
+  "name": "Inventory AI Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "public": false,
+        "options": {}
+      },
+      "id": "6c3a87c9-f6b9-47e1-96e7-292d94730735",
+      "name": "When chat message received",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "811c6a61-26e2-4dcc-b10c-61f9131e8192"
+    },
+    {
+      "parameters": {
+        "promptType": "auto",
+        "options": {
+          "systemMessage": "Ты ИИ-ассистент менеджера по закупкам и поставкам на маркетплейсе.\n\nПравила:\n1. Все данные об остатках, продажах и поставках получай только через инструмент get_inventory. Цифры не придумывай и не пересчитывай: используй готовые поля инструмента (days_left, reorder_qty, status).\n2. Статусы: СРОЧНО — товара хватит на меньше дней, чем занимает поставка; СКОРО — запас закончится в пределах срока поставки + 14 дней; ЗАТОВАРКА — запаса больше чем на 90 дней; ОК — остальное.\n3. Отвечай по-русски, коротко: сначала вывод, потом цифры. В списках — не больше 5 позиций, самые срочные первыми.\n4. На вопрос «что заказать» называй артикул, название, остаток, запас в днях и количество к заказу.\n5. Если просят отчёт для руководителя — 4-5 строк: сколько позиций срочных, какие именно, общий объём к заказу, где затоварка.\n6. Если данных нет или артикул не найден, так и скажи. Не угадывай."
+        }
+      },
+      "id": "081128b8-79a0-49a2-8e81-5ff658bfba2b",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "174cf230-15fb-494b-84cb-ba3ac5fdbcad",
+      "name": "Gemini Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        160,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 8
+      },
+      "id": "2f5d6a3f-7bef-4d03-831f-e55c485e1f17",
+      "name": "Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        340,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_inventory",
+        "description": "Возвращает остатки, продажи, срок поставки, запас в днях, статус и количество к заказу по товарам, а также сводку. Входной параметр: 'all' для всех товаров, артикул (например SKU-005 или 5), часть названия или статус (СРОЧНО, СКОРО, ЗАТОВАРКА, ОК).",
+        "language": "javaScript",
+        "jsCode": "// Инструмент get_inventory: считает запас в днях, статус и количество к заказу.\n// Расчёт делает код, нейросеть только вызывает инструмент и формулирует ответ.\nconst DATA = [{\"sku\": \"SKU-001\", \"name\": \"Чехол для iPhone 15 прозрачный\", \"stock\": 420, \"sales_30d\": 310, \"lead_time_days\": 14, \"price_kzt\": 1990}, {\"sku\": \"SKU-002\", \"name\": \"Защитное стекло для iPhone 15\", \"stock\": 85, \"sales_30d\": 260, \"lead_time_days\": 14, \"price_kzt\": 1490}, {\"sku\": \"SKU-003\", \"name\": \"Кабель USB-C 1 м\", \"stock\": 640, \"sales_30d\": 180, \"lead_time_days\": 21, \"price_kzt\": 1290}, {\"sku\": \"SKU-004\", \"name\": \"Наушники TWS Air Pro\", \"stock\": 120, \"sales_30d\": 210, \"lead_time_days\": 25, \"price_kzt\": 7990}, {\"sku\": \"SKU-005\", \"name\": \"Power bank 10000 mAh\", \"stock\": 60, \"sales_30d\": 150, \"lead_time_days\": 25, \"price_kzt\": 8990}, {\"sku\": \"SKU-006\", \"name\": \"Зарядное устройство 20 Вт\", \"stock\": 300, \"sales_30d\": 95, \"lead_time_days\": 21, \"price_kzt\": 3490}, {\"sku\": \"SKU-007\", \"name\": \"Умная лампа Wi-Fi\", \"stock\": 75, \"sales_30d\": 70, \"lead_time_days\": 30, \"price_kzt\": 4590}, {\"sku\": \"SKU-008\", \"name\": \"Коврик для мыши XL\", \"stock\": 510, \"sales_30d\": 40, \"lead_time_days\": 14, \"price_kzt\": 2990}, {\"sku\": \"SKU-009\", \"name\": \"Подставка для ноутбука\", \"stock\": 95, \"sales_30d\": 120, \"lead_time_days\": 18, \"price_kzt\": 5990}, {\"sku\": \"SKU-010\", \"name\": \"Автодержатель магнитный\", \"stock\": 28, \"sales_30d\": 130, \"lead_time_days\": 14, \"price_kzt\": 2490}, {\"sku\": \"SKU-011\", \"name\": \"Веб-камера 1080p\", \"stock\": 70, \"sales_30d\": 55, \"lead_time_days\": 28, \"price_kzt\": 9990}, {\"sku\": \"SKU-012\", \"name\": \"Клавиатура беспроводная\", \"stock\": 150, \"sales_30d\": 85, \"lead_time_days\": 28, \"price_kzt\": 8490}, {\"sku\": \"SKU-013\", \"name\": \"Мышь беспроводная\", \"stock\": 220, \"sales_30d\": 160, \"lead_time_days\": 21, \"price_kzt\": 3990}, {\"sku\": \"SKU-014\", \"name\": \"Колонка Bluetooth mini\", \"stock\": 33, \"sales_30d\": 90, \"lead_time_days\": 30, \"price_kzt\": 6990}, {\"sku\": \"SKU-015\", \"name\": \"Сетевой фильтр 5 розеток\", \"stock\": 260, \"sales_30d\": 75, \"lead_time_days\": 14, \"price_kzt\": 4490}, {\"sku\": \"SKU-016\", \"name\": \"Смарт-часы Fit\", \"stock\": 52, \"sales_30d\": 48, \"lead_time_days\": 30, \"price_kzt\": 14990}, {\"sku\": \"SKU-017\", \"name\": \"Карта памяти 128 ГБ\", \"stock\": 190, \"sales_30d\": 140, \"lead_time_days\": 21, \"price_kzt\": 5490}, {\"sku\": \"SKU-018\", \"name\": \"Ремешок для смарт-часов\", \"stock\": 410, \"sales_30d\": 35, \"lead_time_days\": 14, \"price_kzt\": 1790}, {\"sku\": \"SKU-019\", \"name\": \"Светодиодная лента 5 м\", \"stock\": 95, \"sales_30d\": 115, \"lead_time_days\": 21, \"price_kzt\": 3290}, {\"sku\": \"SKU-020\", \"name\": \"Адаптер HDMI - USB-C\", \"stock\": 40, \"sales_30d\": 25, \"lead_time_days\": 25, \"price_kzt\": 6490}];\n\nconst raw = typeof query === 'string' ? query : (query && query.query) || '';\nconst q = String(raw).trim().toLowerCase();\n\nconst rows = DATA.map(d => {\n  const daily = d.sales_30d / 30;\n  const daysLeft = daily > 0 ? Math.round((d.stock / daily) * 10) / 10 : null;\n  const reorder = daily > 0 ? Math.max(0, Math.ceil((d.lead_time_days + 14) * daily - d.stock)) : 0;\n  let status = 'ОК';\n  if (daysLeft === null) status = 'НЕТ ПРОДАЖ';\n  else if (daysLeft < d.lead_time_days) status = 'СРОЧНО';\n  else if (daysLeft < d.lead_time_days + 14) status = 'СКОРО';\n  else if (daysLeft > 90) status = 'ЗАТОВАРКА';\n  return { ...d, sales_per_day: Math.round(daily * 100) / 100, days_left: daysLeft, reorder_qty: reorder, status };\n});\nrows.sort((a, b) => (a.days_left ?? 1e9) - (b.days_left ?? 1e9));\n\nconst count = s => rows.filter(r => r.status === s).length;\nconst summary = {\n  total_items: rows.length,\n  urgent: count('СРОЧНО'),\n  soon: count('СКОРО'),\n  overstock: count('ЗАТОВАРКА'),\n  total_reorder_units: rows.reduce((s, r) => s + r.reorder_qty, 0)\n};\n\nlet items = rows;\nif (q && q !== 'all' && q !== 'все') {\n  const sku = /^\\d+$/.test(q) ? 'sku-' + q.padStart(3, '0') : q;\n  const found = rows.filter(r =>\n    r.sku.toLowerCase() === sku || r.name.toLowerCase().includes(q) || r.status.toLowerCase() === q);\n  if (found.length) items = found;\n}\nreturn JSON.stringify({ summary, items });\n"
+      },
+      "id": "45f47a02-9dc9-4ee3-904e-d487bbd99f56",
+      "name": "get_inventory",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## ИИ-ассистент по остаткам и поставкам\n\n**Запуск:**\n1. В узле «Gemini Flash» выберите (или создайте) credential с API-ключом из Google AI Studio.\n2. Нажмите «Open chat» и спросите: «Что нужно срочно заказать?»\n\nРасчёты делает код в инструменте get_inventory, нейросеть формулирует ответ.\nДанные в проекте вымышленные.",
+        "height": 260,
+        "width": 380
+      },
+      "id": "b234cad0-63c0-417f-9157-2f6d57f83805",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -320
+      ]
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_inventory": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
